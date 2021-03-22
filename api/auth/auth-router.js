@@ -1,7 +1,32 @@
 // Require `checkUsernameFree`, `checkUsernameExists` and `checkPasswordLength`
 // middleware functions from `auth-middleware.js`. You will need them here!
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const router = express.Router();
+const User = require('../users/users-model');
+const {
+  checkUsernameFree,
+  checkUsernameExists,
+  checkPasswordLength,
+} = require('./auth-middleware');
 
+router.post(
+  '/register',
+  checkUsernameFree,
+  checkPasswordLength,
+  (req, res, next) => {
+    const { password } = req.body;
+    const hash = bcrypt.hashSync(password, 10);
 
+    req.body.password = hash;
+
+    User.add(req.body)
+      .then((registered) => {
+        res.status(200).json(registered);
+      })
+      .catch(next);
+  }
+);
 /**
   1 [POST] /api/auth/register { "username": "sue", "password": "1234" }
 
@@ -24,7 +49,16 @@
     "message": "Password must be longer than 3 chars"
   }
  */
-
+router.post('/login', checkUsernameExists, (req, res, next) => {
+  try {
+    if (bcrypt.compareSync(req.body.password, req.user.password)) {
+      req.session.user = req.user;
+      res.status(200).json({ message: `welcome back!` });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
   2 [POST] /api/auth/login { "username": "sue", "password": "1234" }
@@ -42,6 +76,19 @@
   }
  */
 
+router.get('/logout', (req, res) => {
+  if (req.session && req.session.user) {
+    req.session.destroy((err) => {
+      if (err) {
+        res.json('you cannot leave');
+      } else {
+        res.json('goodbye');
+      }
+    });
+  } else {
+    res.json('you are not actually logged in');
+  }
+});
 
 /**
   3 [GET] /api/auth/logout
@@ -59,5 +106,5 @@
   }
  */
 
- 
 // Don't forget to add the router to the `exports` object so it can be required in other modules
+module.exports = router;

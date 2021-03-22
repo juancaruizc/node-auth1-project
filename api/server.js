@@ -1,6 +1,10 @@
-const express = require("express");
-const helmet = require("helmet");
-const cors = require("cors");
+const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
+const session = require('express-session');
+const KnexSessionStore = require('connect-session-knex')(session);
+const usersRouter = require('./users/users-router');
+const authRouter = require('./auth/auth-router');
 
 /**
   Do what needs to be done to support sessions with the `express-session` package!
@@ -17,15 +21,40 @@ const cors = require("cors");
 
 const server = express();
 
+server.use(
+  session({
+    name: 'chocolatechip',
+    secret: 'shh',
+    cookie: {
+      maxAge: 1000 * 10 * 6,
+      secure: false,
+      httpOnly: false,
+      resave: false,
+      saveUninitialized: false,
+      store: new KnexSessionStore({
+        knex: require('../data/connection'),
+        tablename: 'sessions',
+        sidfieldname: 'session_id',
+        createtable: true,
+        clearInterval: 1000 * 60 * 60,
+      }),
+    },
+  })
+);
+
 server.use(helmet());
 server.use(express.json());
 server.use(cors());
 
-server.get("/", (req, res) => {
-  res.json({ api: "up" });
+server.use('/api/auth', authRouter);
+server.use('/api/users', usersRouter);
+
+server.get('/', (req, res) => {
+  res.json({ api: 'up' });
 });
 
-server.use((err, req, res, next) => { // eslint-disable-line
+server.use((err, req, res, next) => {
+  // eslint-disable-line
   res.status(500).json({
     message: err.message,
     stack: err.stack,
